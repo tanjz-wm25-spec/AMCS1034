@@ -206,7 +206,7 @@ def generate_report_text():
     if grand_total == 0:
         return "No expenses recorded yet."
 
-    report_text = ["--- SPENDING SUMMARY ---\n"]
+    report_text = ["   --- SPENDING SUMMARY ---\n"]
     for category, total in summary.items():
         percentage = (total / grand_total) * 100
         report_text.append(f"{category:<12} : RM {total:6.2f} ({percentage:4.1f}%)")
@@ -274,8 +274,7 @@ tk.Button(chore_page, text="Back to Main Menu", command=back_to_menu).pack(side=
 
 # Budget page
 tk.Label(budget_page, text="Welcome to Budget Tracker").pack(pady=10)
-budget_switch_btn = tk.Button(budget_page, text="View Report", command=lambda: switch_budget_view("report"),bg='#ADD8E6', width=15
-) # <--- 注意：在这里我们不写 global 了
+budget_switch_btn = tk.Button(budget_page, text="View Report", command=lambda: switch_budget_view("report"),bg='#ADD8E6', width=15)
 budget_switch_btn.pack(pady=5)
 
 # --- 2. Input View Frame ---
