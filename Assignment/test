@@ -16,6 +16,7 @@ def open_budget_page():
     budget_page.pack()
     main_menu.pack_forget()
     load_expenses() 
+    switch_budget_view("input")
 
 def open_meal_page():
     meal_page.pack()
@@ -62,6 +63,8 @@ category_buttons = {}
 listbox_expenses = None
 total_label = None
 entry_amount = None
+current_budget_view = None
+budget_switch_btn = None
 
 # --- Data Persistence Functions ---
 
@@ -171,6 +174,96 @@ def clear_expenses():
         update_total()
         
         tk.messagebox.showinfo("Success", "All expenses have been cleared.")
+        
+def calculate_summary():
+    """Calculates total spending and category summary using standard library."""
+    spending_summary = {}
+    grand_total = 0.0
+    
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader, None)
+
+            for row in reader:
+                if len(row) < 3: continue 
+                category, amount_str, date = row
+                try:
+                    amount = float(amount_str)
+                    grand_total += amount
+                    if category in spending_summary:
+                        spending_summary[category] += amount
+                    else:
+                        spending_summary[category] = amount
+                except ValueError:
+                    continue 
+    return spending_summary, grand_total
+
+def generate_report_text():
+    """Calculates summary and returns the formatted report string."""
+    summary, grand_total = calculate_summary()
+    
+    if grand_total == 0:
+        return "No expenses recorded yet."
+
+    report_text = ["--- SPENDING SUMMARY ---\n"]
+    for category, total in summary.items():
+        percentage = (total / grand_total) * 100
+        report_text.append(f"{category:<12} : RM {total:6.2f} ({percentage:4.1f}%)")
+    
+    report_text.append("\n" + f"{'TOTAL':<12} : RM {grand_total:6.2f}")
+    
+    return "\n".join(report_text)
+
+def switch_budget_view(view_name):
+    """Switches between the input view and the report view and updates the switch button."""
+    global current_budget_view
+    global budget_switch_btn
+    
+    if current_budget_view is not None:
+        current_budget_view.pack_forget()
+
+    if view_name == "input":
+        current_budget_view = input_view
+        input_view.pack(fill=tk.BOTH, expand=True)
+        load_expenses() 
+        
+        if budget_switch_btn:
+            budget_switch_btn.config(
+                text="View Report", 
+                command=lambda: switch_budget_view("report")
+            )
+        
+    elif view_name == "report":
+        current_budget_view = report_view
+        report_view.pack(fill=tk.BOTH, expand=True)
+        report_content.config(text=generate_report_text()) 
+        
+        if budget_switch_btn:
+            budget_switch_btn.config(
+                text="Back to Input", 
+                command=lambda: switch_budget_view("input")
+            )
+
+def display_spending_report():
+    """Formats and displays the report."""
+    global report_label
+    if report_label is None: return
+    
+    summary, grand_total = calculate_summary()
+    
+    if grand_total == 0:
+        report_label.config(text="No expenses recorded yet.")
+        return
+
+    report_text = ["--- SPENDING SUMMARY ---\n"]
+    for category, total in summary.items():
+        percentage = (total / grand_total) * 100
+        report_text.append(f"{category:<12} : RM {total:6.2f} ({percentage:4.1f}%)")
+    
+    report_text.append("\n" + f"{'TOTAL':<12} : RM {grand_total:6.2f}")
+    report_label.config(text="\n".join(report_text), justify=tk.LEFT, font=("Courier", 10))
+
 # Grocery Page
 tk.Label(grocery_page, text="Welcome to Grocery Page!").pack(pady=20)
 tk.Button(grocery_page, text="Back to Main Menu", command=back_to_menu).pack(side="bottom", pady=10)
@@ -181,7 +274,15 @@ tk.Button(chore_page, text="Back to Main Menu", command=back_to_menu).pack(side=
 
 # Budget page
 tk.Label(budget_page, text="Welcome to Budget Tracker").pack(pady=10)
-frame_category = tk.Frame(budget_page)
+budget_switch_btn = tk.Button(budget_page, text="View Report", command=lambda: switch_budget_view("report"),bg='#ADD8E6', width=15
+) # <--- 注意：在这里我们不写 global 了
+budget_switch_btn.pack(pady=5)
+
+# --- 2. Input View Frame ---
+input_view = tk.Frame(budget_page) 
+
+# Category Selection
+frame_category = tk.Frame(input_view)
 frame_category.pack(pady=5)
 
 tk.Label(frame_category, text="Select Category:").pack(side=tk.TOP, pady=(0, 5))
@@ -197,11 +298,11 @@ for i, cat in enumerate(CATEGORIES):
     category_buttons[cat] = btn
 
 # Selected Category Indicator
-category_label_indicator = tk.Label(budget_page, text="Selected Category: None", fg='blue')
+category_label_indicator = tk.Label(input_view, text="Selected Category: None", fg='blue')
 category_label_indicator.pack(pady=5)
 
-# 3. Amount Input and Add/Clear Button Area
-frame_input = tk.Frame(budget_page)
+# Amount Input and Add/Clear Button Area
+frame_input = tk.Frame(input_view)
 frame_input.pack(pady=10)
 
 tk.Label(frame_input, text="Amount:").grid(row=0, column=0, padx=5, pady=5)
@@ -214,15 +315,26 @@ btn_add.grid(row=1, column=0, columnspan=2, pady=10)
 btn_clear = tk.Button(frame_input, text="Clear ALL", command=clear_expenses, bg='pink', fg='red')
 btn_clear.grid(row=2, column=0, columnspan=2, pady=5)
 
-# 4. Transaction List and Total
-tk.Label(budget_page, text="Transactions:").pack(pady=(10, 0))
-listbox_expenses = tk.Listbox(budget_page, width=50, height=8) # Assign to global variable
+# Transaction List and Total
+tk.Label(input_view, text="Transactions:").pack(pady=(10, 0))
+listbox_expenses = tk.Listbox(input_view, width=50, height=8) 
 listbox_expenses.pack(pady=5)
 
-total_label = tk.Label(budget_page, text="Total Expenses: RM 0.00", font=("Arial", 10, "bold")) 
+total_label = tk.Label(input_view, text="Total Expenses: RM 0.00", font=("Arial", 10, "bold")) 
 total_label.pack(pady=5)
 
+
+# --- 3. Report View Frame ---
+report_view = tk.Frame(budget_page) 
+tk.Label(report_view, text="Spending Insights Report", font=("Arial", 14, "bold")).pack(pady=10)
+report_content = tk.Label(report_view, text="Click 'Go to Reports' to view data.", 
+                         justify=tk.LEFT, font=("Courier", 10), 
+                         anchor="nw", padx=10, bg="#F0F0F0")
+report_content.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
 tk.Button(budget_page, text="Back to Main Menu", command=back_to_menu).pack(side="bottom", pady=10)
+
+switch_budget_view("input")
 
 # Meal Planner Page
 tk.Label(meal_page, text="Welcome to Meal Planner!").pack(pady=20)
